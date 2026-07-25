@@ -6,6 +6,7 @@ import { baseConfig } from './vitest.shared';
 export default mergeConfig(baseConfig, {
   test: {
     include: ['**/*.e2e-spec.ts'],
+    setupFiles: ['./test/setup-env.ts'],
     fileParallelism: false,
     testTimeout: 1_000_000,
     hookTimeout: 1_000_000,

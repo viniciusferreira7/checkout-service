@@ -101,8 +101,9 @@ with the types inferred from that schema.
 | `JWT_SECRET`   | Secret for JWT signing/verification     | Yes      |
 | `RABBITMQ_URL` | AMQP connection string for the broker   | Yes      |
 
-`.env.test` holds throwaway values so the test lanes can boot the application;
-it is loaded ahead of `.env` and must never contain real credentials.
+`.env.test` is loaded ahead of `.env` and is gitignored, so the lanes that boot
+the application get their values from `test/setup-env.ts` instead. Anything
+already set in `process.env` wins, which lets CI override any of them.
 
 ## Roadmap
 
