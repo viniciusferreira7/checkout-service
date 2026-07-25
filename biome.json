@@ -90,7 +90,7 @@
   },
   "javascript": {
     "globals": [
-      "jest",
+      "vi",
       "describe",
       "it",
       "test",

@@ -23,6 +23,5 @@ allowBuilds:
   # Telemetry/funding postinstalls — nothing needed at runtime.
   '@nestjs/core': false
   '@scarf/scarf': false
-  # Native resolver pulled in by jest-resolve; the prebuilt platform binary
-  # ships as an optional dependency, so the build script is not needed.
-  unrs-resolver: false
+  # Native transformer used by Vitest for NestJS decorator metadata.
+  '@swc/core': true
