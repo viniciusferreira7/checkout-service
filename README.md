@@ -1,98 +1,88 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Checkout Service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> 🚧 **Work In Progress** — Only the project scaffold and its tooling are in place. No checkout logic has been implemented yet.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Checkout microservice for the Marketplace microservices architecture. Owns the checkout flow — turning a cart into an order and coordinating with payments — and persists its own state in PostgreSQL.
 
-## Description
+Part of the **marketplace-ms** study project, alongside the [api-gateway](https://github.com/viniciusferreira7/api-gateway) (synchronous HTTP entry point) and the [messaging-service](https://github.com/viniciusferreira7/messaging-service) (asynchronous event backbone).
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Stack
 
-## Project setup
+Built with [NestJS](https://nestjs.com/) 11 on Node.js, with [TypeORM](https://typeorm.io/) over PostgreSQL. Linting and formatting run on [Biome](https://biomejs.dev/); tests run on [Jest](https://jestjs.io/).
+
+Dependencies are installed but not wired up yet: `@nestjs/typeorm` + `pg` for persistence, `@nestjs/jwt` + `bcryptjs` for auth, and `undici` for outbound HTTP.
+
+## Requirements
+
+- Node.js 20+
+- [pnpm](https://pnpm.io/) 11+
+- PostgreSQL
+
+## Running
 
 ```bash
-$ pnpm install
+# install dependencies
+pnpm install
+
+# development (watch mode)
+pnpm start:dev
+
+# production
+pnpm build
+pnpm start:prod
 ```
 
-## Compile and run the project
+The service listens on `PORT` (default: `3000`).
 
-```bash
-# development
-$ pnpm run start
+## Scripts
 
-# watch mode
-$ pnpm run start:dev
+| Script             | Description                          |
+|--------------------|--------------------------------------|
+| `pnpm start`       | Start the server                     |
+| `pnpm start:dev`   | Start in watch mode                  |
+| `pnpm start:debug` | Start in watch + debug mode          |
+| `pnpm build`       | Compile to `dist/`                   |
+| `pnpm lint`        | Lint and fix with Biome              |
+| `pnpm check`       | Check formatting and lint with Biome |
+| `pnpm check:fix`   | Format and lint-fix with Biome       |
+| `pnpm check:type`  | Type-check with TypeScript           |
+| `pnpm format`      | Format with Biome                    |
+| `pnpm test`        | Run the unit tests once              |
+| `pnpm test:watch`  | Run tests in watch mode              |
+| `pnpm test:cov`    | Run tests with coverage              |
+| `pnpm test:e2e`    | Run the end-to-end tests             |
 
-# production mode
-$ pnpm run start:prod
-```
+## Supply-chain hardening
 
-## Run tests
+Install-time policies live in `pnpm-workspace.yaml`:
 
-```bash
-# unit tests
-$ pnpm run test
+| Setting                | Effect                                                              |
+|------------------------|---------------------------------------------------------------------|
+| `minimumReleaseAge`    | Rejects package versions published less than 7 days ago              |
+| `strictDepBuilds`      | Fails the install on any dependency with an unreviewed build script  |
+| `allowBuilds`          | Explicit allowlist of packages permitted to run build scripts        |
+| `saveExact`            | Writes exact versions instead of ranges                              |
+| `engineStrict`         | Fails when the local Node/pnpm does not satisfy `engines`            |
+| `preferFrozenLockfile` | Installs from the lockfile as-is                                     |
 
-# e2e tests
-$ pnpm run test:e2e
+Every entry in `allowBuilds` is currently set to `false` — no dependency runs build scripts. When a new one shows up, `pnpm install` fails and appends it to `pnpm-workspace.yaml` for review rather than executing it.
 
-# test coverage
-$ pnpm run test:cov
-```
+> Because of `minimumReleaseAge`, a freshly published version can fail to resolve with `ERR_PNPM_NO_MATURE_MATCHING_VERSION`. Wait out the cooldown or add the version to `minimumReleaseAgeExclude`.
 
-## Deployment
+## Roadmap
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- [ ] Environment validation (Zod schema) with fail-fast startup
+- [ ] TypeORM data source, entities, and migrations
+- [ ] Checkout domain: cart → order
+- [ ] Integration with the payments service
+- [ ] Publish and consume domain events via the messaging service
+- [ ] Authentication and authorization
+- [ ] Swagger/OpenAPI docs
+- [ ] Test coverage beyond the scaffold
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Related repositories
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+| Repository | Description |
+|------------|-------------|
+| [api-gateway](https://github.com/viniciusferreira7/api-gateway) | Central HTTP entry point for the Marketplace microservices |
+| [messaging-service](https://github.com/viniciusferreira7/messaging-service) | Asynchronous messaging backbone (RabbitMQ) |
