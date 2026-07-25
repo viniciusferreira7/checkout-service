@@ -8,7 +8,7 @@ Part of the **marketplace-ms** study project, alongside the [api-gateway](https:
 
 ## Stack
 
-Built with [NestJS](https://nestjs.com/) 11 on Node.js, with [TypeORM](https://typeorm.io/) over PostgreSQL. Linting and formatting run on [Biome](https://biomejs.dev/); tests run on [Jest](https://jestjs.io/).
+Built with [NestJS](https://nestjs.com/) 11 on Node.js, with [TypeORM](https://typeorm.io/) over PostgreSQL. Linting and formatting run on [Biome](https://biomejs.dev/); tests run on [Vitest](https://vitest.dev/).
 
 Dependencies are installed but not wired up yet: `@nestjs/typeorm` + `pg` for persistence, `@nestjs/jwt` + `bcryptjs` for auth, and `undici` for outbound HTTP.
 
@@ -47,10 +47,27 @@ The service listens on `PORT` (default: `3000`).
 | `pnpm check:fix`   | Format and lint-fix with Biome       |
 | `pnpm check:type`  | Type-check with TypeScript           |
 | `pnpm format`      | Format with Biome                    |
-| `pnpm test`        | Run the unit tests once              |
-| `pnpm test:watch`  | Run tests in watch mode              |
-| `pnpm test:cov`    | Run tests with coverage              |
+| `pnpm test:unit`   | Run the unit tests once              |
+| `pnpm test:int`    | Run the integration tests            |
 | `pnpm test:e2e`    | Run the end-to-end tests             |
+| `pnpm test:watch`  | Run the unit lane in watch mode      |
+| `pnpm test:cov`    | Run tests with coverage              |
+
+## Testing
+
+Tests run on [Vitest](https://vitest.dev/), split into three lanes that share a
+base config (`vitest.shared.ts`). SWC handles the transform so NestJS decorator
+metadata survives into the tests.
+
+| Lane        | Config                  | Files            | Scope                                                      |
+|-------------|-------------------------|------------------|------------------------------------------------------------|
+| Unit        | `vitest.config.ts`      | `*.spec.ts`      | Pure and isolated — no app boot, no external infra          |
+| Integration | `vitest.config.int.ts`  | `*.int-spec.ts`  | Modules wired through DI with real infra, below HTTP        |
+| E2E         | `vitest.config.e2e.ts`  | `*.e2e-spec.ts`  | Full application booted and driven over HTTP                |
+
+The integration and e2e lanes run serially with long timeouts. Only the unit and
+e2e lanes have tests today — `pnpm test:int` exits non-zero until the first
+`*.int-spec.ts` exists, which is Vitest's default "no test files found".
 
 ## Supply-chain hardening
 
