@@ -86,9 +86,26 @@ Every entry in `allowBuilds` is currently set to `false` — no dependency runs 
 
 > Because of `minimumReleaseAge`, a freshly published version can fail to resolve with `ERR_PNPM_NO_MATURE_MATCHING_VERSION`. Wait out the cooldown or add the version to `minimumReleaseAgeExclude`.
 
+## Environment variables
+
+Copy `.env.example` to `.env` and fill in the values. Every variable is validated
+by a Zod schema (`src/env/env.ts`) when `ConfigModule` boots, so the app fails
+fast on misconfiguration instead of crashing later. `EnvService` exposes them
+with the types inferred from that schema.
+
+| Variable       | Description                             | Required |
+|----------------|-----------------------------------------|----------|
+| `NODE_ENV`     | `dev` \| `test` \| `production`         | No (`dev`) |
+| `PORT`         | HTTP port                               | No (`3334`) |
+| `DATABASE_URL` | PostgreSQL connection string            | Yes      |
+| `JWT_SECRET`   | Secret for JWT signing/verification     | Yes      |
+| `RABBITMQ_URL` | AMQP connection string for the broker   | Yes      |
+
+`.env.test` holds throwaway values so the test lanes can boot the application;
+it is loaded ahead of `.env` and must never contain real credentials.
+
 ## Roadmap
 
-- [ ] Environment validation (Zod schema) with fail-fast startup
 - [ ] TypeORM data source, entities, and migrations
 - [ ] Checkout domain: cart → order
 - [ ] Integration with the payments service
