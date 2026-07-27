@@ -6,6 +6,8 @@ const baseEnv = {
   JWT_SECRET: 'secret',
   JWT_EXPIRES_IN: '1s',
   RABBITMQ_URL: 'amqp://admin:admin@localhost:5672',
+  RABBITMQ_QUEUE_PAYMENTS: 'payment_queue',
+  RABBITMQ_EXCHANGE: 'payments',
 };
 
 describe('envSchema', () => {
@@ -39,6 +41,16 @@ describe('envSchema', () => {
   it('rejects an invalid RABBITMQ_URL', () => {
     expect(() =>
       envSchema.parse({ ...baseEnv, RABBITMQ_URL: 'not-a-url' })
+    ).toThrow();
+  });
+  it('rejects an empty  RABBITMQ_QUEUE_PAYMENTS', () => {
+    expect(() =>
+      envSchema.parse({ ...baseEnv, RABBITMQ_QUEUE_PAYMENTS: '' })
+    ).toThrow();
+  });
+  it('rejects an empty  RABBITMQ_EXCHANGE', () => {
+    expect(() =>
+      envSchema.parse({ ...baseEnv, RABBITMQ_EXCHANGE: '' })
     ).toThrow();
   });
 

@@ -10,6 +10,8 @@ export const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().min(2),
 
   RABBITMQ_URL: z.url(),
+  RABBITMQ_QUEUE_PAYMENTS: z.string().min(1),
+  RABBITMQ_EXCHANGE: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;
