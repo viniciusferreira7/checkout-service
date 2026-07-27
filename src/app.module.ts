@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { databaseConfig } from './config/database.config';
 import { envSchema } from './env/env';
 import { EnvModule } from './env/env.module';
+import { EnvService } from './env/env.service';
 
 @Module({
   imports: [
@@ -15,6 +18,11 @@ import { EnvModule } from './env/env.module';
       },
     }),
     EnvModule,
+    TypeOrmModule.forRootAsync({
+      imports: [EnvModule],
+      inject: [EnvService],
+      useFactory: databaseConfig,
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],
