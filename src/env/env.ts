@@ -7,6 +7,7 @@ export const envSchema = z.object({
   DATABASE_URL: z.url(),
 
   JWT_SECRET: z.string().min(1),
+  JWT_EXPIRES_IN: z.string().min(2),
 
   RABBITMQ_URL: z.url(),
 });

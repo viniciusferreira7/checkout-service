@@ -4,6 +4,7 @@ import { envSchema } from './env';
 const baseEnv = {
   DATABASE_URL: 'postgres://user:pass@localhost:5432/checkout',
   JWT_SECRET: 'secret',
+  JWT_EXPIRES_IN: '1s',
   RABBITMQ_URL: 'amqp://admin:admin@localhost:5672',
 };
 
@@ -43,6 +44,10 @@ describe('envSchema', () => {
 
   it('rejects an empty JWT_SECRET', () => {
     expect(() => envSchema.parse({ ...baseEnv, JWT_SECRET: '' })).toThrow();
+  });
+
+  it('rejects an empty JWT_EXPIRES_IN', () => {
+    expect(() => envSchema.parse({ ...baseEnv, JWT_EXPIRES_IN: '' })).toThrow();
   });
 
   it('rejects an unknown NODE_ENV', () => {
