@@ -7,6 +7,7 @@ import { databaseConfig } from './config/database.config';
 import { envSchema } from './env/env';
 import { EnvModule } from './env/env.module';
 import { EnvService } from './env/env.service';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { EnvService } from './env/env.service';
       inject: [EnvService],
       useFactory: databaseConfig,
     }),
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
