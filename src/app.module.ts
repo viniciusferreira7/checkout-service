@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ObservabilityModule } from '@viniciusferreira7/signals/nest';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { databaseConfig } from './config/database.config';
@@ -19,6 +20,7 @@ import { EventsModule } from './events/events.module';
       },
     }),
     EnvModule,
+    ObservabilityModule.forRoot({ serviceName: 'checkout-service' }),
     TypeOrmModule.forRootAsync({
       imports: [EnvModule],
       inject: [EnvService],
