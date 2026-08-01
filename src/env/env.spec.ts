@@ -8,6 +8,8 @@ const baseEnv = {
   RABBITMQ_URL: 'amqp://admin:admin@localhost:5672',
   RABBITMQ_QUEUE_PAYMENTS: 'payment_queue',
   RABBITMQ_EXCHANGE: 'payments',
+  OTEL_SERVICE_NAME: 'checkout-service',
+  OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
 };
 
 describe('envSchema', () => {

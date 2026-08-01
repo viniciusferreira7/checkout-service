@@ -12,6 +12,9 @@ export const envSchema = z.object({
   RABBITMQ_URL: z.url(),
   RABBITMQ_QUEUE_PAYMENTS: z.string().min(1),
   RABBITMQ_EXCHANGE: z.string().min(1),
+
+  OTEL_SERVICE_NAME: z.string().min(1),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.url(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -11,7 +11,14 @@ const defaults: Record<string, string> = {
   PORT: '3334',
   DATABASE_URL: 'postgres://test:test@localhost:5432/checkout_test',
   JWT_SECRET: 'test-secret',
+  JWT_EXPIRES_IN: '1d',
   RABBITMQ_URL: 'amqp://test:test@localhost:5672',
+  RABBITMQ_QUEUE_PAYMENTS: 'payment_queue',
+  RABBITMQ_EXCHANGE: 'payments',
+  // `NODE_ENV=test` disables the signals SDK, so nothing is exported. These
+  // only exist to satisfy the Zod schema.
+  OTEL_SERVICE_NAME: 'checkout-service',
+  OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
 };
 
 for (const [key, value] of Object.entries(defaults)) {
