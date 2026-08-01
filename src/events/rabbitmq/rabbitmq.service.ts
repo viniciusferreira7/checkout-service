@@ -31,31 +31,50 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async connect() {
+    const rabbitMqUrl = this.envService.get('RABBITMQ_URL');
+
     try {
-      const rabbitMqUrl = this.envService.get('RABBITMQ_URL');
-
-      await Promise.all([
-        amqp.connect(rabbitMqUrl),
-        this.connection.createChannel(),
-      ]);
-
+      this.connection = await amqp.connect(rabbitMqUrl);
       this.logger.log('Connected on RabbitmQ successfully');
-      this.logger.log('Created channel on RabbitmQ successfully');
     } catch (error) {
-      this.logger.error('Failed to connect on RabbiMq', error);
+      this.logger.error(
+        'Failed to connect on RabbiMq',
+        error instanceof Error ? error.stack : undefined
+      );
+
+      return;
+    }
+
+    try {
+      this.channel = await this.connection.createChannel();
+      this.logger.log('Created create on RabbitmQ successfully');
+    } catch (error) {
+      this.logger.error(
+        `Failed to create channel on RabbitMQ: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined
+      );
     }
   }
 
   private async disconnect() {
     try {
-      await Promise.all([
-        this.channel ? this.channel.close() : Promise.resolve(),
-        this.connection ? this.connection.close() : Promise.resolve(),
-      ]);
-
-      this.logger.log('RabbitMQ service was disconnect');
+      if (this.channel) {
+        await this.channel.close();
+        this.logger.log('RabbitMQ channel service was closed');
+      }
+      if (this.connection) {
+        await this.connection.close();
+        this.logger.log('RabbitMQ service was disconnected');
+      }
     } catch (error) {
-      this.logger.error('Failed to disconnect from RabbitMq', error);
+      this.logger.error(
+        `Failed to disconnect from RabbitMQ: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined
+      );
     }
   }
 }

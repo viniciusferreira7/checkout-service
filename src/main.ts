@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { PinoLoggerService } from '@viniciusferreira7/signals/nest';
 import { AppModule } from './app.module';
@@ -22,7 +22,8 @@ async function bootstrap() {
 
   await app.listen(port);
 
-  console.log(`🚀 API Gateway running on port ${port}`);
-  console.log(`📚 Swagger documentation: <http://localhost:${port}/api/docs>`);
+  const logger = new Logger('Bootstrap');
+  logger.log(`🚀 Checkout service running on port ${port}`);
+  logger.log(`📚 Swagger documentation: <http://localhost:${port}/api/docs>`);
 }
 bootstrap();
