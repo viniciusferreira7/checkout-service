@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import * as amqp from 'amqplib';
 import { EnvService } from '@/env/env.service';
+import { getErrorDetails } from '@/utils/error.util';
 
 @Injectable()
 export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
@@ -37,9 +38,10 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       this.connection = await amqp.connect(rabbitMqUrl);
       this.logger.log('Connected on RabbitmQ successfully');
     } catch (error) {
+      const errorDetails = getErrorDetails(error);
       this.logger.error(
-        'Failed to connect on RabbiMq',
-        error instanceof Error ? error.stack : undefined
+        `Failed to connect on RabbiMQ: ${errorDetails.message}`,
+        errorDetails.stack
       );
 
       return;
@@ -49,11 +51,11 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       this.channel = await this.connection.createChannel();
       this.logger.log('Created create on RabbitmQ successfully');
     } catch (error) {
+      const errorDetails = getErrorDetails(error);
+
       this.logger.error(
-        `Failed to create channel on RabbitMQ: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        error instanceof Error ? error.stack : undefined
+        `Failed to create channel on RabbitMQ: ${errorDetails.message}`,
+        errorDetails.stack
       );
     }
   }
@@ -69,11 +71,10 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
         this.logger.log('RabbitMQ service was disconnected');
       }
     } catch (error) {
+      const errorDetails = getErrorDetails(error);
       this.logger.error(
-        `Failed to disconnect from RabbitMQ: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        error instanceof Error ? error.stack : undefined
+        `Failed to disconnect from RabbitMQ: ${errorDetails.message}`,
+        errorDetails.stack
       );
     }
   }
