@@ -7,6 +7,7 @@ import {
 import * as amqp from 'amqplib';
 import { EnvService } from '@/env/env.service';
 import { getErrorDetails } from '@/utils/error.util';
+import type { PublicMessageParams } from '../interfaces/public-menssage.interface';
 
 @Injectable()
 export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
@@ -74,6 +75,50 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       const errorDetails = getErrorDetails(error);
       this.logger.error(
         `Failed to disconnect from RabbitMQ: ${errorDetails.message}`,
+        errorDetails.stack
+      );
+    }
+  }
+
+  public async publicMessage({
+    exchange,
+    routingKey,
+    message,
+  }: PublicMessageParams): Promise<void> {
+    try {
+      if (!this.channel) {
+        this.logger.warn(
+          'RabbiMq channel not available, skipping message publish'
+        );
+
+        return;
+      }
+
+      await this.channel.assertExchange(exchange, 'topic', { durable: true });
+      const messageBuffer = Buffer.from(JSON.stringify(message));
+
+      const publishedMessage = await this.channel.publish(
+        exchange,
+        routingKey,
+        messageBuffer,
+        {
+          persistent: true,
+          timestamp: Date.now(),
+          contentType: 'application/json',
+        }
+      );
+
+      if (!publishedMessage)
+        throw new Error('Failed to publish message to RabbiMQ');
+
+      this.logger.log(
+        `Message was published to [EXCHANGE]: ${exchange} - [ROUTING KEY]: ${routingKey}`
+      );
+      this.logger.debug(`Message content: ${JSON.stringify(message)}`);
+    } catch (error) {
+      const errorDetails = getErrorDetails(error);
+      this.logger.error(
+        `Error publishing message to RabbitMQ: ${errorDetails.message}`,
         errorDetails.stack
       );
     }
