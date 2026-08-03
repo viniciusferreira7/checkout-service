@@ -7,7 +7,7 @@ import {
 import * as amqp from 'amqplib';
 import { EnvService } from '@/env/env.service';
 import { getErrorDetails } from '@/utils/error.util';
-import type { PublicMessageParams } from '../interfaces/public-menssage.interface';
+import type { PublicMessageParams } from '../interfaces/public-message.interface';
 
 @Injectable()
 export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
@@ -97,7 +97,7 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       await this.channel.assertExchange(exchange, 'topic', { durable: true });
       const messageBuffer = Buffer.from(JSON.stringify(message));
 
-      const publishedMessage = await this.channel.publish(
+      const publishedMessage = this.channel.publish(
         exchange,
         routingKey,
         messageBuffer,
