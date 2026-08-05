@@ -8,6 +8,7 @@ import * as amqp from 'amqplib';
 import { EnvService } from '@/env/env.service';
 import { getErrorDetails } from '@/utils/error.util';
 import type { PublicMessageParams } from '../interfaces/public-message.interface';
+import type { SubscribeToQueue } from '../interfaces/subscribe-to-queue.interface';
 
 @Injectable()
 export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
@@ -119,6 +120,64 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       const errorDetails = getErrorDetails(error);
       this.logger.error(
         `Error publishing message to RabbitMQ: ${errorDetails.message}`,
+        errorDetails.stack
+      );
+    }
+  }
+
+  public async subscribeToQueue({
+    queueName,
+    exchange,
+    routingKey,
+    callback,
+  }: SubscribeToQueue): Promise<void> {
+    try {
+      await this.channel.assertExchange(exchange, 'topic', { durable: true });
+
+      const queue = await this.channel.assertQueue(queueName, {
+        durable: true,
+        arguments: {
+          'x-message-ttl': 86_400_000, // 24 hours
+          'x-max-length': 10_000, // 10 thousand seconds
+        },
+      });
+
+      await this.channel.bindQueue(queue.queue, exchange, routingKey);
+
+      await this.channel.prefetch(1);
+
+      await this.channel.consume(queue.queue, async (msm) => {
+        if (msm) {
+          try {
+            const messageIntoJson = msm.content.toJSON();
+            this.logger.log(`Message received from queue: ${queueName}`);
+            this.logger.debug(`Message content: ${messageIntoJson}`);
+            await callback(msm.content.toJSON());
+
+            this.channel.ack(msm);
+            this.logger.log(
+              `Message processed successfully from queue: ${queueName}`
+            );
+          } catch (error) {
+            const errorDetails = getErrorDetails(error);
+            this.logger.error(
+              `Error to processing message: ${errorDetails.message}`,
+              errorDetails.stack
+            );
+
+            this.channel.nack(msm, false, false); //TODO: Add into a DLQ (Dead Letter Queue)
+          }
+        }
+
+        this.logger.log(
+          `Subscribed to queue: ${queueName} with routing key: ${routingKey}`
+        );
+      });
+    } catch (error) {
+      const errorDetails = getErrorDetails(error);
+
+      this.logger.error(
+        `Error subscribing to queue ${queueName}: ${errorDetails.message}`,
         errorDetails.stack
       );
     }
