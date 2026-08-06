@@ -1,7 +1,7 @@
 export interface PaymentOrderMessage {
   orderId: string;
   userId: string;
-  amount: string;
+  amount: number;
   items: Array<{
     productId: string;
     quantity: number;
@@ -9,5 +9,5 @@ export interface PaymentOrderMessage {
   }>;
   paymentMethod: string;
   description?: string;
-  createAt: Date;
+  createdAt: Date;
 }
