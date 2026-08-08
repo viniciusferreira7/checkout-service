@@ -4,7 +4,11 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['dev', 'test', 'production']).default('dev'),
   PORT: z.coerce.number().default(3334),
 
-  DATABASE_URL: z.url(),
+  DATABASE_URL: z.string(),
+  DATABASE_PORT: z.coerce.number().default(5432),
+  DATABASE_USERNAME: z.string(),
+  DATABASE_PASSWORD: z.string(),
+  DATABASE_NAME: z.string(),
 
   JWT_SECRET: z.string().min(1),
   JWT_EXPIRES_IN: z.string().min(2),
