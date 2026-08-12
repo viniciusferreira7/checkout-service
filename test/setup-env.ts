@@ -15,6 +15,7 @@ const defaults: Record<string, string> = {
   RABBITMQ_URL: 'amqp://test:test@localhost:5672',
   RABBITMQ_QUEUE_PAYMENTS: 'payment_queue',
   RABBITMQ_EXCHANGE: 'payments',
+  RABBITMQ_ROUTING_KEY_PAYMENT_ORDER: 'payment.order',
   // `NODE_ENV=test` disables the signals SDK, so nothing is exported. These
   // only exist to satisfy the Zod schema.
   OTEL_SERVICE_NAME: 'checkout-service',

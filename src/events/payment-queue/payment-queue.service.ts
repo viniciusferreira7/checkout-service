@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EnvService } from '@/env/env.service';
 import { checkoutServiceDetails } from '@/utils/checkout-service-details';
 import { getErrorDetails } from '@/utils/error.util';
 import type { PaymentOrderMessage } from '../interfaces/payments-queue.interface';
@@ -13,10 +14,10 @@ interface EnrichmentMessage extends PaymentOrderMessage {
 export class PaymentQueueService {
   private readonly logger = new Logger(PaymentQueueService.name);
 
-  private readonly ROUTING_KEY = 'payment.order';
-  private readonly EXCHANGE = 'payments';
-
-  constructor(private readonly rabbitMqService: RabbitmqService) {}
+  constructor(
+    private readonly rabbitMqService: RabbitmqService,
+    private readonly envService: EnvService
+  ) {}
 
   private async publishPaymentOrder(paymentOrder: PaymentOrderMessage) {
     this.logger.log(
@@ -35,8 +36,8 @@ export class PaymentQueueService {
       };
 
       await this.rabbitMqService.publicMessage({
-        exchange: this.EXCHANGE,
-        routingKey: this.ROUTING_KEY,
+        routingKey: this.envService.get('RABBITMQ_ROUTING_KEY_PAYMENT_ORDER'),
+        exchange: this.envService.get('RABBITMQ_EXCHANGE'),
         message: enrichmentMessage,
       });
 

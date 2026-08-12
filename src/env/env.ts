@@ -16,6 +16,10 @@ export const envSchema = z.object({
   RABBITMQ_URL: z.url(),
   RABBITMQ_QUEUE_PAYMENTS: z.string().min(1),
   RABBITMQ_EXCHANGE: z.string().min(1),
+  RABBITMQ_ROUTING_KEY_PAYMENT_ORDER: z
+    .string()
+    .min(1)
+    .default('payment.order'),
 
   OTEL_SERVICE_NAME: z.string().min(1),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.url(),

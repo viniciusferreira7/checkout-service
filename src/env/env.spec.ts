@@ -8,6 +8,7 @@ const baseEnv = {
   RABBITMQ_URL: 'amqp://admin:admin@localhost:5672',
   RABBITMQ_QUEUE_PAYMENTS: 'payment_queue',
   RABBITMQ_EXCHANGE: 'payments',
+  RABBITMQ_ROUTING_KEY_PAYMENT_ORDER: 'payment.order',
   OTEL_SERVICE_NAME: 'checkout-service',
   OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
 };
@@ -45,14 +46,19 @@ describe('envSchema', () => {
       envSchema.parse({ ...baseEnv, RABBITMQ_URL: 'not-a-url' })
     ).toThrow();
   });
-  it('rejects an empty  RABBITMQ_QUEUE_PAYMENTS', () => {
+  it('rejects an empty RABBITMQ_QUEUE_PAYMENTS', () => {
     expect(() =>
       envSchema.parse({ ...baseEnv, RABBITMQ_QUEUE_PAYMENTS: '' })
     ).toThrow();
   });
-  it('rejects an empty  RABBITMQ_EXCHANGE', () => {
+  it('rejects an empty RABBITMQ_EXCHANGE', () => {
     expect(() =>
       envSchema.parse({ ...baseEnv, RABBITMQ_EXCHANGE: '' })
+    ).toThrow();
+  });
+  it('rejects an empty RABBITMQ_ROUTING_KEY_PAYMENT_ORDER', () => {
+    expect(() =>
+      envSchema.parse({ ...baseEnv, RABBITMQ_ROUTING_KEY_PAYMENT_ORDER: '' })
     ).toThrow();
   });
 
