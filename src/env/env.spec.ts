@@ -3,6 +3,9 @@ import { envSchema } from './env';
 
 const baseEnv = {
   DATABASE_URL: 'postgres://user:pass@localhost:5432/checkout',
+  DATABASE_USERNAME: 'user',
+  DATABASE_PASSWORD: 'pass',
+  DATABASE_NAME: 'checkout',
   JWT_SECRET: 'secret',
   JWT_EXPIRES_IN: '1s',
   RABBITMQ_URL: 'amqp://admin:admin@localhost:5672',
