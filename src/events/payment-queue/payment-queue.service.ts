@@ -83,6 +83,18 @@ export class PaymentQueueService {
       return false;
     }
 
+    const itemsTotal = paymentOrder.items.reduce(
+      (acc, item) => acc + item.price * item.quantity,
+      0
+    );
+
+    const expectedAmount = itemsTotal - paymentOrder.discount;
+
+    if (paymentOrder.amount !== expectedAmount) {
+      this.logger.error('Payment amount does not match order total');
+      return false;
+    }
+
     return true;
   }
 
