@@ -1,4 +1,6 @@
 import { Logger } from '@nestjs/common';
+import type { PublicMessageParams } from '@/events/interfaces/public-message.interface';
+import type { SubscribeToQueue } from '@/events/interfaces/subscribe-to-queue.interface';
 import type { RabbitmqService } from '@/events/rabbitmq/rabbitmq.service';
 
 /**
@@ -14,6 +16,9 @@ export class FakeRabbitmqService implements Partial<RabbitmqService> {
 
   connected = false;
 
+  readonly published: PublicMessageParams[] = [];
+  readonly subscriptions = new Map<string, SubscribeToQueue>();
+
   async onModuleInit() {
     this.connected = true;
     this.logger.debug('Fake RabbitMQ connected');
@@ -22,5 +27,27 @@ export class FakeRabbitmqService implements Partial<RabbitmqService> {
   async onModuleDestroy() {
     this.connected = false;
     this.logger.debug('Fake RabbitMQ disconnected');
+  }
+
+  getChannel() {
+    return {} as ReturnType<RabbitmqService['getChannel']>;
+  }
+
+  async publicMessage(params: PublicMessageParams) {
+    this.published.push(params);
+  }
+
+  async subscribeToQueue(params: SubscribeToQueue) {
+    this.subscriptions.set(params.queueName, params);
+  }
+
+  async deliver(queueName: string, message: unknown) {
+    const subscription = this.subscriptions.get(queueName);
+
+    if (!subscription) {
+      throw new Error(`No subscription registered for queue: ${queueName}`);
+    }
+
+    await subscription.callback(message);
   }
 }
