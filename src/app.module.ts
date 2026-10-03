@@ -9,6 +9,7 @@ import { envSchema } from './env/env';
 import { EnvModule } from './env/env.module';
 import { EnvService } from './env/env.service';
 import { EventsModule } from './events/events.module';
+import { checkoutServiceDetails } from './utils/checkout-service-details';
 
 @Module({
   imports: [
@@ -20,7 +21,10 @@ import { EventsModule } from './events/events.module';
       },
     }),
     EnvModule,
-    ObservabilityModule.forRoot({ serviceName: 'checkout-service' }),
+    ObservabilityModule.forRoot({
+      serviceName: checkoutServiceDetails.name,
+      serviceVersion: checkoutServiceDetails.version,
+    }),
     TypeOrmModule.forRootAsync({
       imports: [EnvModule],
       inject: [EnvService],
