@@ -11,7 +11,7 @@
     "start": "nest start --exec 'node --env-file-if-exists=.env --require @viniciusferreira7/signals/register'",
     "start:dev": "nest start --watch --exec 'node --env-file-if-exists=.env --require @viniciusferreira7/signals/register'",
     "start:debug": "nest start --debug --watch --exec 'node --env-file-if-exists=.env --require @viniciusferreira7/signals/register'",
-    "start:prod": "node --env-file-if-exists=.env --require @viniciusferreira7/signals/register dist/main",
+    "start:prod": "node --env-file-if-exists=.env --require @viniciusferreira7/signals/register dist/src/main",
     "lint": "biome lint --write",
     "check": "biome check",
     "check:fix": "biome check --write",
