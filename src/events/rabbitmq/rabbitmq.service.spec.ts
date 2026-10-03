@@ -389,22 +389,31 @@ describe('RabbitmqService', () => {
   });
 
   describe('metrics', () => {
-    let connections: ReturnType<typeof vi.spyOn>;
-    let failures: ReturnType<typeof vi.spyOn>;
-    let consumed: ReturnType<typeof vi.spyOn>;
-    let processing: ReturnType<typeof vi.spyOn>;
+    // Without a meter provider every counter is one shared no-op object, so a
+    // spy on one would also see writes meant for another. Each instrument gets
+    // its own mock instead: a value recorded on the wrong one fails the test.
+    const originals = { ...metrics };
+    let connections: ReturnType<typeof vi.fn>;
+    let failures: ReturnType<typeof vi.fn>;
+    let consumed: ReturnType<typeof vi.fn>;
+    let processing: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      // No meter provider is registered under NODE_ENV=test, so every counter
-      // below is the SAME shared no-op object. The attributes are what tell
-      // them apart — never the call count.
-      connections = vi.spyOn(metrics.broker_connection_attempts, 'add');
-      failures = vi.spyOn(metrics.broker_publish_failures, 'add');
-      consumed = vi.spyOn(metrics.queue_messages_consumed, 'add');
-      processing = vi.spyOn(
-        metrics.queue_message_processing_duration,
-        'record'
-      );
+      connections = vi.fn();
+      failures = vi.fn();
+      consumed = vi.fn();
+      processing = vi.fn();
+
+      Object.assign(metrics, {
+        broker_connection_attempts: { add: connections },
+        broker_publish_failures: { add: failures },
+        queue_messages_consumed: { add: consumed },
+        queue_message_processing_duration: { record: processing },
+      });
+    });
+
+    afterEach(() => {
+      Object.assign(metrics, originals);
     });
 
     it('counts a connection that reached a channel', async () => {

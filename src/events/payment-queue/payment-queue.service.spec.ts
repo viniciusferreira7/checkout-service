@@ -228,18 +228,31 @@ describe('PaymentQueueService', () => {
   });
 
   describe('metrics', () => {
-    let published: ReturnType<typeof vi.spyOn>;
-    let duration: ReturnType<typeof vi.spyOn>;
-    let amount: ReturnType<typeof vi.spyOn>;
+    // Without a meter provider every counter is one shared no-op object, so a
+    // spy on one would also see writes meant for another. Each instrument gets
+    // its own mock instead: a value recorded on the wrong one fails the test.
+    const originals = { ...metrics };
+    let published: ReturnType<typeof vi.fn>;
+    let rejected: ReturnType<typeof vi.fn>;
+    let duration: ReturnType<typeof vi.fn>;
+    let amount: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      // The instruments are OpenTelemetry no-ops until a meter provider is
-      // registered, which never happens under NODE_ENV=test. Note every
-      // counter is then the SAME shared no-op object, so the attributes — not
-      // the call count — are what tell two counters apart.
-      published = vi.spyOn(metrics.payment_orders_published, 'add');
-      duration = vi.spyOn(metrics.payment_order_publish_duration, 'record');
-      amount = vi.spyOn(metrics.payment_order_amount, 'record');
+      published = vi.fn();
+      rejected = vi.fn();
+      duration = vi.fn();
+      amount = vi.fn();
+
+      Object.assign(metrics, {
+        payment_orders_published: { add: published },
+        payment_orders_rejected: { add: rejected },
+        payment_order_publish_duration: { record: duration },
+        payment_order_amount: { record: amount },
+      });
+    });
+
+    afterEach(() => {
+      Object.assign(metrics, originals);
     });
 
     it('counts a published order by outcome, and times it', async () => {
@@ -267,9 +280,10 @@ describe('PaymentQueueService', () => {
         service.publishPaymentOrderSafe(makeOrder({ orderId: '' }))
       ).rejects.toThrow('Invalid payment order');
 
-      expect(published).toHaveBeenCalledWith(1, {
+      expect(rejected).toHaveBeenCalledExactlyOnceWith(1, {
         reason: 'missing_order_id',
       });
+      expect(published).not.toHaveBeenCalled();
     });
 
     it('counts an amount mismatch apart from a missing field', async () => {
@@ -277,7 +291,10 @@ describe('PaymentQueueService', () => {
         service.publishPaymentOrderSafe(makeOrder({ amount: 999 }))
       ).rejects.toThrow('Invalid payment order');
 
-      expect(published).toHaveBeenCalledWith(1, { reason: 'amount_mismatch' });
+      expect(rejected).toHaveBeenCalledExactlyOnceWith(1, {
+        reason: 'amount_mismatch',
+      });
+      expect(published).not.toHaveBeenCalled();
     });
 
     it('records the amount of an accepted order, by payment method', async () => {
