@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { EnvService } from '@/env/env.service';
+import { metrics } from '@/observability/metrics';
 import { RabbitmqService } from './rabbitmq.service';
 
 const { amqpConnect } = vi.hoisted(() => ({ amqpConnect: vi.fn() }));
@@ -384,6 +385,185 @@ describe('RabbitmqService', () => {
         `Error subscribing to queue ${subscription.queueName}: ${failure.message}`,
         failure.stack
       );
+    });
+  });
+
+  describe('metrics', () => {
+    let connections: ReturnType<typeof vi.spyOn>;
+    let failures: ReturnType<typeof vi.spyOn>;
+    let consumed: ReturnType<typeof vi.spyOn>;
+    let processing: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      // No meter provider is registered under NODE_ENV=test, so every counter
+      // below is the SAME shared no-op object. The attributes are what tell
+      // them apart — never the call count.
+      connections = vi.spyOn(metrics.broker_connection_attempts, 'add');
+      failures = vi.spyOn(metrics.broker_publish_failures, 'add');
+      consumed = vi.spyOn(metrics.queue_messages_consumed, 'add');
+      processing = vi.spyOn(
+        metrics.queue_message_processing_duration,
+        'record'
+      );
+    });
+
+    it('counts a connection that reached a channel', async () => {
+      amqpConnect.mockResolvedValue({
+        createChannel: vi.fn().mockResolvedValue({}),
+      });
+
+      await service.onModuleInit();
+
+      expect(connections).toHaveBeenCalledWith(1, { outcome: 'connected' });
+    });
+
+    it('counts a refused connection', async () => {
+      amqpConnect.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await service.onModuleInit();
+
+      expect(connections).toHaveBeenCalledWith(1, { outcome: 'refused' });
+    });
+
+    // A broker that answers but hands out no channel is a different failure
+    // from one that never answered, and gets its own bucket.
+    it('counts a connection that got no channel', async () => {
+      amqpConnect.mockResolvedValue({
+        createChannel: vi.fn().mockRejectedValue(new Error('channel error')),
+      });
+
+      await service.onModuleInit();
+
+      expect(connections).toHaveBeenCalledWith(1, { outcome: 'no_channel' });
+    });
+
+    it('counts a message dropped for want of a channel', async () => {
+      await service.publicMessage({
+        exchange: 'payments',
+        routingKey: 'payment.order',
+        message: { orderId: 'order-1' },
+      });
+
+      expect(failures).toHaveBeenCalledWith(1, {
+        exchange: 'payments',
+        reason: 'no_channel',
+      });
+    });
+
+    it('counts a full write buffer once, not twice', async () => {
+      Reflect.set(service, 'channel', {
+        assertExchange: vi.fn().mockResolvedValue(undefined),
+        publish: vi.fn().mockReturnValue(false),
+      });
+
+      await service.publicMessage({
+        exchange: 'payments',
+        routingKey: 'payment.order',
+        message: { orderId: 'order-1' },
+      });
+
+      expect(failures).toHaveBeenCalledTimes(1);
+      expect(failures).toHaveBeenCalledWith(1, {
+        exchange: 'payments',
+        reason: 'write_buffer_full',
+      });
+    });
+
+    it('counts a broker error under its own reason', async () => {
+      Reflect.set(service, 'channel', {
+        assertExchange: vi.fn().mockRejectedValue(new Error('mismatch')),
+        publish: vi.fn(),
+      });
+
+      await service.publicMessage({
+        exchange: 'payments',
+        routingKey: 'payment.order',
+        message: { orderId: 'order-1' },
+      });
+
+      expect(failures).toHaveBeenCalledWith(1, {
+        exchange: 'payments',
+        reason: 'error',
+      });
+    });
+
+    describe('deliveries', () => {
+      const subscription = {
+        queueName: 'payment_queue',
+        exchange: 'payments',
+        routingKey: 'payment.order',
+        callback: vi.fn(),
+      };
+
+      async function deliver(failing: boolean) {
+        let onMessage: ((message: unknown) => Promise<void>) | undefined;
+
+        Reflect.set(service, 'channel', {
+          assertExchange: vi.fn().mockResolvedValue(undefined),
+          assertQueue: vi
+            .fn()
+            .mockResolvedValue({ queue: subscription.queueName }),
+          bindQueue: vi.fn().mockResolvedValue(undefined),
+          prefetch: vi.fn().mockResolvedValue(undefined),
+          consume: vi.fn(
+            async (
+              _queue: string,
+              handler: (message: unknown) => Promise<void>
+            ) => {
+              onMessage = handler;
+            }
+          ),
+          ack: vi.fn(),
+          nack: vi.fn(),
+        });
+
+        subscription.callback.mockReset();
+        subscription.callback.mockImplementation(async () => {
+          if (failing) {
+            throw new Error('handler exploded');
+          }
+        });
+
+        await service.subscribeToQueue(subscription);
+        await onMessage?.({
+          content: Buffer.from(JSON.stringify({ orderId: 'order-1' })),
+        });
+      }
+
+      it('counts an acknowledged message as processed, and times it', async () => {
+        await deliver(false);
+
+        expect(consumed).toHaveBeenCalledWith(1, {
+          queue: subscription.queueName,
+          outcome: 'processed',
+        });
+        expect(processing).toHaveBeenCalledWith(expect.any(Number), {
+          queue: subscription.queueName,
+          outcome: 'processed',
+        });
+      });
+
+      it('counts a nacked message as rejected', async () => {
+        await deliver(true);
+
+        expect(consumed).toHaveBeenCalledWith(1, {
+          queue: subscription.queueName,
+          outcome: 'rejected',
+        });
+      });
+
+      it('carries no unbounded attribute into the counter', async () => {
+        await deliver(false);
+
+        // The message body or an order id here would mint a time series per
+        // message; only closed sets belong in an attribute.
+        for (const [, attributes] of consumed.mock.calls) {
+          expect(Object.keys(attributes as object).sort()).toEqual([
+            'outcome',
+            'queue',
+          ]);
+        }
+      });
     });
   });
 });

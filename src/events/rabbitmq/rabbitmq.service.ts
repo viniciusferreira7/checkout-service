@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import * as amqp from 'amqplib';
 import { EnvService } from '@/env/env.service';
+import { metrics } from '@/observability/metrics';
 import { getErrorDetails } from '@/utils/error.util';
 import type { PublicMessageParams } from '../interfaces/public-message.interface';
 import type { SubscribeToQueue } from '../interfaces/subscribe-to-queue.interface';
@@ -41,6 +42,9 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       this.logger.log('Connected on RabbitmQ successfully');
     } catch (error) {
       const errorDetails = getErrorDetails(error);
+
+      metrics.broker_connection_attempts.add(1, { outcome: 'refused' });
+
       this.logger.error(
         `Failed to connect on RabbiMQ: ${errorDetails.message}`,
         errorDetails.stack
@@ -52,8 +56,12 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
     try {
       this.channel = await this.connection.createChannel();
       this.logger.log('Created on RabbitmQ successfully');
+
+      metrics.broker_connection_attempts.add(1, { outcome: 'connected' });
     } catch (error) {
       const errorDetails = getErrorDetails(error);
+
+      metrics.broker_connection_attempts.add(1, { outcome: 'no_channel' });
 
       this.logger.error(
         `Failed to create channel on RabbitMQ: ${errorDetails.message}`,
@@ -88,6 +96,11 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
   }: PublicMessageParams): Promise<void> {
     try {
       if (!this.channel) {
+        metrics.broker_publish_failures.add(1, {
+          exchange,
+          reason: 'no_channel',
+        });
+
         this.logger.warn(
           'RabbiMq channel not available, skipping message publish'
         );
@@ -109,8 +122,14 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
         }
       );
 
-      if (!publishedMessage)
+      if (!publishedMessage) {
+        metrics.broker_publish_failures.add(1, {
+          exchange,
+          reason: 'write_buffer_full',
+        });
+
         throw new Error('Failed to publish message to RabbiMQ');
+      }
 
       this.logger.log(
         `Message was published to [EXCHANGE]: ${exchange} - [ROUTING KEY]: ${routingKey}`
@@ -118,11 +137,34 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       this.logger.debug(`Message content: ${JSON.stringify(message)}`);
     } catch (error) {
       const errorDetails = getErrorDetails(error);
+
+      // A full write buffer already counted itself with its own reason.
+      if (errorDetails.message !== 'Failed to publish message to RabbiMQ') {
+        metrics.broker_publish_failures.add(1, { exchange, reason: 'error' });
+      }
+
       this.logger.error(
         `Error publishing message to RabbitMQ: ${errorDetails.message}`,
         errorDetails.stack
       );
     }
+  }
+
+  /**
+   * Records how one delivery ended. Attributes stay a closed set: the queue is
+   * configuration, the outcome is one of two words, and the message body never
+   * becomes either.
+   */
+  private settleDelivery(
+    queue: string,
+    outcome: 'processed' | 'rejected',
+    startedAt: number
+  ): void {
+    metrics.queue_messages_consumed.add(1, { queue, outcome });
+    metrics.queue_message_processing_duration.record(Date.now() - startedAt, {
+      queue,
+      outcome,
+    });
   }
 
   public async subscribeToQueue({
@@ -148,6 +190,8 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
 
       await this.channel.consume(queue.queue, async (msm) => {
         if (msm) {
+          const startedAt = Date.now();
+
           try {
             const messageIntoJson = msm.content.toJSON();
             this.logger.log(`Message received from queue: ${queueName}`);
@@ -155,6 +199,9 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
             await callback(msm.content.toJSON());
 
             this.channel.ack(msm);
+
+            this.settleDelivery(queueName, 'processed', startedAt);
+
             this.logger.log(
               `Message processed successfully from queue: ${queueName}`
             );
@@ -166,6 +213,8 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
             );
 
             this.channel.nack(msm, false, false); //TODO: Add into a DLQ (Dead Letter Queue)
+
+            this.settleDelivery(queueName, 'rejected', startedAt);
           }
         }
 
