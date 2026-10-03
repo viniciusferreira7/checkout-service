@@ -1,10 +1,14 @@
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { EnvService } from '@/env/env.service';
+import { metrics } from '@/observability/metrics';
 import { checkoutServiceDetails } from '@/utils/checkout-service-details';
 import type { PaymentOrderMessage } from '../interfaces/payments-queue.interface';
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
-import { PaymentQueueService } from './payment-queue.service';
+import {
+  PaymentQueueService,
+  paymentMethodBucket,
+} from './payment-queue.service';
 
 const silence = () => undefined;
 
@@ -222,4 +226,107 @@ describe('PaymentQueueService', () => {
       );
     });
   });
+
+  describe('metrics', () => {
+    let published: ReturnType<typeof vi.spyOn>;
+    let duration: ReturnType<typeof vi.spyOn>;
+    let amount: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      // The instruments are OpenTelemetry no-ops until a meter provider is
+      // registered, which never happens under NODE_ENV=test. Note every
+      // counter is then the SAME shared no-op object, so the attributes — not
+      // the call count — are what tell two counters apart.
+      published = vi.spyOn(metrics.payment_orders_published, 'add');
+      duration = vi.spyOn(metrics.payment_order_publish_duration, 'record');
+      amount = vi.spyOn(metrics.payment_order_amount, 'record');
+    });
+
+    it('counts a published order by outcome, and times it', async () => {
+      await service.publishPaymentOrderSafe(makeOrder());
+
+      expect(published).toHaveBeenCalledWith(1, { outcome: 'succeeded' });
+      expect(duration).toHaveBeenCalledWith(expect.any(Number), {
+        outcome: 'succeeded',
+      });
+    });
+
+    it('counts a publish the broker refused as failed', async () => {
+      rabbitMqService.publicMessage.mockRejectedValue(new Error('no channel'));
+
+      await service.publishPaymentOrderSafe(makeOrder());
+
+      expect(published).toHaveBeenCalledWith(1, { outcome: 'failed' });
+    });
+
+    it('counts a rejected order by validation reason', async () => {
+      await expect(
+        service.publishPaymentOrderSafe(makeOrder({ orderId: '' }))
+      ).rejects.toThrow('Invalid payment order');
+
+      expect(published).toHaveBeenCalledWith(1, {
+        reason: 'missing_order_id',
+      });
+    });
+
+    it('counts an amount mismatch apart from a missing field', async () => {
+      await expect(
+        service.publishPaymentOrderSafe(makeOrder({ amount: 999 }))
+      ).rejects.toThrow('Invalid payment order');
+
+      expect(published).toHaveBeenCalledWith(1, { reason: 'amount_mismatch' });
+    });
+
+    it('records the amount of an accepted order, by payment method', async () => {
+      await service.publishPaymentOrderSafe(
+        makeOrder({ paymentMethod: 'pix' })
+      );
+
+      expect(amount).toHaveBeenCalledWith(100, { payment_method: 'pix' });
+    });
+
+    it('buckets an unknown payment method as other', async () => {
+      await service.publishPaymentOrderSafe(
+        makeOrder({ paymentMethod: 'crypto' })
+      );
+
+      expect(amount).toHaveBeenCalledWith(100, { payment_method: 'other' });
+    });
+
+    it('does not record an amount for a rejected order', async () => {
+      await expect(
+        service.publishPaymentOrderSafe(makeOrder({ userId: '' }))
+      ).rejects.toThrow('Invalid payment order');
+
+      expect(amount).not.toHaveBeenCalled();
+    });
+
+    it('carries no unbounded attribute into the counter', async () => {
+      await service.publishPaymentOrderSafe(makeOrder());
+
+      // An order or user id as an attribute mints a time series per order;
+      // only closed sets belong here.
+      for (const [, attributes] of published.mock.calls) {
+        expect(Object.keys(attributes as object)).toEqual(['outcome']);
+      }
+    });
+  });
+});
+
+describe('paymentMethodBucket', () => {
+  it.each(['credit_card', 'debit_card', 'pix', 'boleto'])(
+    'keeps the known method %s',
+    (method) => {
+      expect(paymentMethodBucket(method)).toBe(method);
+    }
+  );
+
+  // The value comes off the message unchecked: each distinct string would
+  // otherwise mint its own time series.
+  it.each(['crypto', 'PIX', '', 'credit_card '])(
+    'turns %j into other',
+    (method) => {
+      expect(paymentMethodBucket(method)).toBe('other');
+    }
+  );
 });
