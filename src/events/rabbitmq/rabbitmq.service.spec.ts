@@ -171,7 +171,7 @@ describe('RabbitmqService', () => {
     }
 
     it('skips publishing when the channel is not available', async () => {
-      await expect(service.publicMessage(params)).resolves.toBeUndefined();
+      await expect(service.publicMessage(params)).resolves.toBe(false);
 
       expect(warn).toHaveBeenCalledWith(
         'RabbiMq channel not available, skipping message publish'
@@ -193,7 +193,7 @@ describe('RabbitmqService', () => {
     it('publishes the message as a persistent JSON buffer', async () => {
       const channel = givenChannel();
 
-      await service.publicMessage(params);
+      await expect(service.publicMessage(params)).resolves.toBe(true);
 
       expect(channel.publish).toHaveBeenCalledWith(
         params.exchange,
@@ -213,7 +213,7 @@ describe('RabbitmqService', () => {
     it('logs when the broker refuses the message', async () => {
       givenChannel({ publish: vi.fn().mockReturnValue(false) });
 
-      await expect(service.publicMessage(params)).resolves.toBeUndefined();
+      await expect(service.publicMessage(params)).resolves.toBe(false);
 
       expect(error).toHaveBeenCalledWith(
         'Error publishing message to RabbitMQ: Failed to publish message to RabbiMQ',
@@ -225,7 +225,7 @@ describe('RabbitmqService', () => {
       const failure = new Error('exchange mismatch');
       givenChannel({ assertExchange: vi.fn().mockRejectedValue(failure) });
 
-      await expect(service.publicMessage(params)).resolves.toBeUndefined();
+      await expect(service.publicMessage(params)).resolves.toBe(false);
 
       expect(error).toHaveBeenCalledWith(
         `Error publishing message to RabbitMQ: ${failure.message}`,

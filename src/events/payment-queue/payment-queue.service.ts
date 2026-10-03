@@ -65,11 +65,22 @@ export class PaymentQueueService {
         },
       };
 
-      await this.rabbitMqService.publicMessage({
+      const published = await this.rabbitMqService.publicMessage({
         routingKey: this.envService.get('RABBITMQ_ROUTING_KEY_PAYMENT_ORDER'),
         exchange: this.envService.get('RABBITMQ_EXCHANGE'),
         message: enrichmentMessage,
       });
+
+      // The broker service already logged why; a dropped order is a failed
+      // publish, never a success.
+      if (!published) {
+        this.settle('failed', startedAt);
+        this.logger.error(
+          `Payment order was not published: [ORDER ID]: ${paymentOrder.orderId}`
+        );
+
+        return;
+      }
 
       this.logger.log(
         `Payment order published successfully: [ORDER ID]: ${paymentOrder.orderId}, [AMOUNT ID]: ${paymentOrder.amount}, [USER ID]: ${paymentOrder.userId}`

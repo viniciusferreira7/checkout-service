@@ -89,11 +89,17 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Never rejects, so a broker problem cannot take the caller down. Answers
+   * whether the message actually left: `false` means it was dropped (no
+   * channel, full write buffer or a broker error) and the caller decides what
+   * a lost message means for it.
+   */
   public async publicMessage({
     exchange,
     routingKey,
     message,
-  }: PublicMessageParams): Promise<void> {
+  }: PublicMessageParams): Promise<boolean> {
     try {
       if (!this.channel) {
         metrics.broker_publish_failures.add(1, {
@@ -105,7 +111,7 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
           'RabbiMq channel not available, skipping message publish'
         );
 
-        return;
+        return false;
       }
 
       await this.channel.assertExchange(exchange, 'topic', { durable: true });
@@ -135,6 +141,8 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
         `Message was published to [EXCHANGE]: ${exchange} - [ROUTING KEY]: ${routingKey}`
       );
       this.logger.debug(`Message content: ${JSON.stringify(message)}`);
+
+      return true;
     } catch (error) {
       const errorDetails = getErrorDetails(error);
 
@@ -147,6 +155,8 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
         `Error publishing message to RabbitMQ: ${errorDetails.message}`,
         errorDetails.stack
       );
+
+      return false;
     }
   }
 

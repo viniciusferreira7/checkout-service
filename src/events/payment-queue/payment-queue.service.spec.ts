@@ -45,7 +45,7 @@ describe('PaymentQueueService', () => {
     vi.spyOn(Logger.prototype, 'debug').mockImplementation(silence);
 
     rabbitMqService = {
-      publicMessage: vi.fn().mockResolvedValue(undefined),
+      publicMessage: vi.fn().mockResolvedValue(true),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -251,12 +251,15 @@ describe('PaymentQueueService', () => {
       });
     });
 
-    it('counts a publish the broker refused as failed', async () => {
-      rabbitMqService.publicMessage.mockRejectedValue(new Error('no channel'));
+    // publicMessage never rejects: it answers false when the message did not
+    // leave (no channel, full buffer, broker error). That is a failed publish.
+    it('counts a publish the broker did not take as failed', async () => {
+      rabbitMqService.publicMessage.mockResolvedValue(false);
 
       await service.publishPaymentOrderSafe(makeOrder());
 
       expect(published).toHaveBeenCalledWith(1, { outcome: 'failed' });
+      expect(published).not.toHaveBeenCalledWith(1, { outcome: 'succeeded' });
     });
 
     it('counts a rejected order by validation reason', async () => {

@@ -35,6 +35,8 @@ export class FakeRabbitmqService implements Partial<RabbitmqService> {
 
   async publicMessage(params: PublicMessageParams) {
     this.published.push(params);
+
+    return true;
   }
 
   async subscribeToQueue(params: SubscribeToQueue) {
