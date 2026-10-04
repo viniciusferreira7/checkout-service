@@ -13,6 +13,7 @@ import { envSchema } from './env/env';
 import { EnvModule } from './env/env.module';
 import { EnvService } from './env/env.service';
 import { EventsModule } from './events/events.module';
+import { HealthModule } from './health/health.module';
 import { OrdersModule } from './orders/orders.module';
 import { checkoutServiceDetails } from './utils/checkout-service-details';
 
@@ -39,6 +40,7 @@ import { checkoutServiceDetails } from './utils/checkout-service-details';
     CartModule,
     OrdersModule,
     AuthModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],
