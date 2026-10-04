@@ -21,7 +21,7 @@ export const envSchema = z.object({
   DATABASE_PASSWORD: z.string(),
   DATABASE_NAME: z.string(),
 
-  JWT_SECRET: z.string().min(1),
+  JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().min(2),
 
   PRODUCTS_SERVICE_URL: z.url(),

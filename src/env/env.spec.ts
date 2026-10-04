@@ -6,7 +6,7 @@ const baseEnv = {
   DATABASE_USERNAME: 'user',
   DATABASE_PASSWORD: 'pass',
   DATABASE_NAME: 'checkout',
-  JWT_SECRET: 'secret',
+  JWT_SECRET: 'unit-test-jwt-secret-with-32-chars!',
   JWT_EXPIRES_IN: '1s',
   RABBITMQ_URL: 'amqp://admin:admin@localhost:5672',
   RABBITMQ_QUEUE_PAYMENTS: 'payment_queue',
@@ -102,6 +102,20 @@ describe('envSchema', () => {
     expect(() =>
       envSchema.parse({ ...baseEnv, RABBITMQ_ROUTING_KEY_PAYMENT_ORDER: '' })
     ).toThrow();
+  });
+
+  // HS256 with a short secret can be brute-forced offline, and whoever finds
+  // it forges a token for any user — same floor as users and products.
+  it('rejects a JWT_SECRET shorter than 32 characters', () => {
+    expect(() =>
+      envSchema.parse({ ...baseEnv, JWT_SECRET: 'x'.repeat(31) })
+    ).toThrow();
+  });
+
+  it('accepts a 32-character JWT_SECRET', () => {
+    expect(
+      envSchema.parse({ ...baseEnv, JWT_SECRET: 'x'.repeat(32) }).JWT_SECRET
+    ).toHaveLength(32);
   });
 
   it('rejects an empty JWT_SECRET', () => {

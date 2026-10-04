@@ -16,7 +16,7 @@ const defaults: Record<string, string> = {
   DATABASE_USERNAME: 'test',
   DATABASE_PASSWORD: 'test',
   DATABASE_NAME: 'checkout_db_test',
-  JWT_SECRET: 'test-secret',
+  JWT_SECRET: 'e2e-test-jwt-secret-with-at-least-32-chars',
   JWT_EXPIRES_IN: '1d',
   // The cart specs stub this service; nothing listens here.
   PRODUCTS_SERVICE_URL: 'http://localhost:3335',
