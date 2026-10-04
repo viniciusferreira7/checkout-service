@@ -97,22 +97,29 @@ with the types inferred from that schema.
 |----------------|-----------------------------------------|----------|
 | `NODE_ENV`     | `dev` \| `test` \| `production`         | No (`dev`) |
 | `PORT`         | HTTP port                               | No (`3336`) |
-| `DATABASE_URL` | PostgreSQL connection string            | Yes      |
-| `JWT_SECRET`   | Secret for JWT signing/verification     | Yes      |
+| `DATABASE_URL` | PostgreSQL connection string (dev Postgres on `5439`) | Yes |
+| `DATABASE_PORT` | Port the compose Postgres is published on | No (`5439`) |
+| `JWT_SECRET`   | Same secret as users-service, at least 32 characters; verifies its tokens | Yes |
+| `PRODUCTS_SERVICE_URL` | Base URL of the products service | Yes (`http://localhost:3335`) |
 | `RABBITMQ_URL` | AMQP connection string for the broker   | Yes      |
 
 `.env.test` is loaded ahead of `.env` and is gitignored, so the lanes that boot
 the application get their values from `test/setup-env.ts` instead. Anything
 already set in `process.env` wins, which lets CI override any of them.
 
+The int and e2e lanes run against a throwaway Postgres on port `5440`
+(`checkout_db_test`, compose profile `test`). `pnpm test:int` and
+`pnpm test:e2e` start it through `pnpm test:infra`; specs refuse to reset any
+database whose name does not end in `_test`.
+
 ## Roadmap
 
-- [ ] TypeORM data source, entities, and migrations
+- [x] TypeORM data source and entities (migrations pending)
 - [ ] Checkout domain: cart → order
 - [ ] Integration with the payments service
 - [ ] Publish and consume domain events via the messaging service
-- [ ] Authentication and authorization
-- [ ] Swagger/OpenAPI docs
+- [x] Authentication (users-service JWT, global guard, `@Public()`)
+- [x] Swagger/OpenAPI docs
 - [ ] Test coverage beyond the scaffold
 
 ## Related repositories
