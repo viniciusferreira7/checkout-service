@@ -17,11 +17,15 @@ const baseEnv = {
 };
 
 describe('envSchema', () => {
-  it('applies the NODE_ENV and PORT defaults', () => {
+  it('applies the NODE_ENV, PORT and DATABASE_PORT defaults', () => {
     const env = envSchema.parse(baseEnv);
 
     expect(env.NODE_ENV).toBe('dev');
-    expect(env.PORT).toBe(3334);
+    // 3334 is the users-service; the checkout owns 3336.
+    expect(env.PORT).toBe(3336);
+    // 5432 is the stock Postgres port, often taken on a dev machine; the
+    // marketplace databases use 5433-5438, so the checkout takes 5439.
+    expect(env.DATABASE_PORT).toBe(5439);
   });
 
   it('defaults LOG_LEVEL to info', () => {

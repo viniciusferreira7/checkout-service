@@ -96,7 +96,7 @@ with the types inferred from that schema.
 | Variable       | Description                             | Required |
 |----------------|-----------------------------------------|----------|
 | `NODE_ENV`     | `dev` \| `test` \| `production`         | No (`dev`) |
-| `PORT`         | HTTP port                               | No (`3334`) |
+| `PORT`         | HTTP port                               | No (`3336`) |
 | `DATABASE_URL` | PostgreSQL connection string            | Yes      |
 | `JWT_SECRET`   | Secret for JWT signing/verification     | Yes      |
 | `RABBITMQ_URL` | AMQP connection string for the broker   | Yes      |

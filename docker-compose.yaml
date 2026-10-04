@@ -3,7 +3,7 @@ services:
     container_name: checkout-service-postgresql
     image: postgres:17.2
     ports:
-      - ${DATABASE_PORT:-5432}:5432
+      - ${DATABASE_PORT:-5439}:5432
     environment:
       POSTGRES_USER: ${DATABASE_USERNAME}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
