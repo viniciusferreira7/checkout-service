@@ -14,6 +14,7 @@ const baseEnv = {
   RABBITMQ_ROUTING_KEY_PAYMENT_ORDER: 'payment.order',
   OTEL_SERVICE_NAME: 'checkout-service',
   OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
+  PRODUCTS_SERVICE_URL: 'http://localhost:3335',
 };
 
 describe('envSchema', () => {
@@ -41,6 +42,24 @@ describe('envSchema', () => {
   it('rejects an unknown LOG_LEVEL', () => {
     expect(() =>
       envSchema.parse({ ...baseEnv, LOG_LEVEL: 'verbose' })
+    ).toThrow();
+  });
+
+  it('keeps PRODUCTS_SERVICE_URL', () => {
+    expect(envSchema.parse(baseEnv).PRODUCTS_SERVICE_URL).toBe(
+      'http://localhost:3335'
+    );
+  });
+
+  it('rejects a missing PRODUCTS_SERVICE_URL', () => {
+    const { PRODUCTS_SERVICE_URL: _, ...withoutUrl } = baseEnv;
+
+    expect(() => envSchema.parse(withoutUrl)).toThrow();
+  });
+
+  it('rejects a PRODUCTS_SERVICE_URL that is not a URL', () => {
+    expect(() =>
+      envSchema.parse({ ...baseEnv, PRODUCTS_SERVICE_URL: 'products' })
     ).toThrow();
   });
 

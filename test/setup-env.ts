@@ -16,6 +16,8 @@ const defaults: Record<string, string> = {
   DATABASE_NAME: 'checkout_test',
   JWT_SECRET: 'test-secret',
   JWT_EXPIRES_IN: '1d',
+  // The cart specs stub this service; nothing listens here.
+  PRODUCTS_SERVICE_URL: 'http://localhost:3335',
   RABBITMQ_URL: 'amqp://admin:admin@localhost:5672',
   RABBITMQ_QUEUE_PAYMENTS: 'payment_queue',
   RABBITMQ_EXCHANGE: 'payments',

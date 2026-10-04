@@ -24,6 +24,8 @@ export const envSchema = z.object({
   JWT_SECRET: z.string().min(1),
   JWT_EXPIRES_IN: z.string().min(2),
 
+  PRODUCTS_SERVICE_URL: z.url(),
+
   RABBITMQ_URL: z.url(),
   RABBITMQ_QUEUE_PAYMENTS: z.string().min(1),
   RABBITMQ_EXCHANGE: z.string().min(1),
