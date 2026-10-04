@@ -15,7 +15,6 @@ export function databaseConfig(env: EnvService): TypeOrmModuleOptions {
     url: env.get('DATABASE_URL'),
     autoLoadEntities: true,
     synchronize: env.get('NODE_ENV') === 'dev',
-    entities: [`${__dirname}/..**/*.entity{.ts,.js}`],
     logging: !isProduction,
   };
 }

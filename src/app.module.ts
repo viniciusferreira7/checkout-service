@@ -4,11 +4,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ObservabilityModule } from '@viniciusferreira7/signals/nest';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CartModule } from './cart/cart.module';
 import { databaseConfig } from './config/database.config';
 import { envSchema } from './env/env';
 import { EnvModule } from './env/env.module';
 import { EnvService } from './env/env.service';
 import { EventsModule } from './events/events.module';
+import { OrdersModule } from './orders/orders.module';
 import { checkoutServiceDetails } from './utils/checkout-service-details';
 
 @Module({
@@ -31,6 +33,8 @@ import { checkoutServiceDetails } from './utils/checkout-service-details';
       useFactory: databaseConfig,
     }),
     EventsModule,
+    CartModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
