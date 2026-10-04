@@ -17,8 +17,10 @@
     "check:fix": "biome check --write",
     "check:type": "tsc --noEmit",
     "test:unit": "vitest run",
-    "test:int": "vitest run --config ./vitest.config.int.ts",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
+    "test:infra": "docker compose --profile test up -d --wait checkout-service-postgresql-test",
+    "test:infra:down": "docker compose --profile test down",
+    "test:int": "pnpm test:infra && vitest run --config ./vitest.config.int.ts",
+    "test:e2e": "pnpm test:infra && vitest run --config ./vitest.config.e2e.ts",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage"
   },

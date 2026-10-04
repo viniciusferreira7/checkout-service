@@ -8,12 +8,14 @@
  */
 const defaults: Record<string, string> = {
   NODE_ENV: 'test',
-  PORT: '3334',
-  DATABASE_URL: 'postgres://test:test@localhost:5432/checkout_test',
-  DATABASE_PORT: '5432',
+  PORT: '3336',
+  // Port 5440 is what `docker-compose.yaml` publishes for the test Postgres
+  // (`${DATABASE_TEST_PORT:-5440}`) — the dev one owns 5439.
+  DATABASE_URL: 'postgres://test:test@localhost:5440/checkout_db_test',
+  DATABASE_PORT: '5440',
   DATABASE_USERNAME: 'test',
   DATABASE_PASSWORD: 'test',
-  DATABASE_NAME: 'checkout_test',
+  DATABASE_NAME: 'checkout_db_test',
   JWT_SECRET: 'test-secret',
   JWT_EXPIRES_IN: '1d',
   // The cart specs stub this service; nothing listens here.

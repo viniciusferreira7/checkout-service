@@ -19,6 +19,27 @@ services:
     volumes:
       - checkout_service_pg_data:/var/lib/postgresql/data
 
+  checkout-service-postgresql-test:
+    container_name: checkout-service-postgresql-test
+    image: postgres:17.2
+    profiles:
+      - test
+    ports:
+      - ${DATABASE_TEST_PORT:-5440}:5432
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: checkout_db_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d checkout_db_test"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
+    networks:
+      - checkout-service-network
+    tmpfs:
+      - /var/lib/postgresql/data
+
 networks:
   checkout-service-network:
     driver: bridge
