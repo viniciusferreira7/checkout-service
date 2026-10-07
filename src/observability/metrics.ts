@@ -39,6 +39,19 @@ export const metrics = defineMetrics(
       kind: 'counter',
       description: 'Messages this service failed to publish to the broker',
     },
+    products_client_requests: {
+      kind: 'counter',
+      description: 'Product lookups on the products service, by outcome',
+    },
+    cart_operations: {
+      kind: 'counter',
+      description: 'Cart changes, by operation and outcome',
+    },
+    cart_operation_duration: {
+      kind: 'histogram',
+      description: 'Time spent on one cart change',
+      unit: 'ms',
+    },
   },
   'checkout-service'
 );
