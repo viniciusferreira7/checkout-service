@@ -15,6 +15,9 @@ import { Cart } from './entities/cart.entity';
 import { CartItem } from './entities/cart-item.entity';
 import { CartStatus } from './enums/cart-status.enum';
 
+/** One retry covers a checkout completing the cart mid-add. */
+const MAX_ACTIVE_CART_ATTEMPTS = 2;
+
 type CartOperation = 'add_item' | 'remove_item';
 type CartOutcome =
   | 'succeeded'
@@ -129,14 +132,20 @@ export class CartService {
 
     try {
       const cart = await this.dataSource.transaction(async (manager) => {
-        const item = await manager
-          .getRepository(CartItem)
-          .createQueryBuilder('item')
-          .innerJoin('item.cart', 'cart')
-          .where('item.id = :itemId', { itemId })
-          .andWhere('cart.userId = :userId', { userId })
-          .andWhere('cart.status = :status', { status: CartStatus.ACTIVE })
-          .getOne();
+        // Lock the active cart first, as checkout does: an item read before
+        // the lock could belong to a cart that a checkout completes while
+        // this waits, and deleting it would rewrite a placed order's lines.
+        const activeCart = await manager.findOne(Cart, {
+          where: { userId, status: CartStatus.ACTIVE },
+          loadEagerRelations: false,
+          lock: { mode: 'pessimistic_write' },
+        });
+        const item = activeCart
+          ? await manager.findOneBy(CartItem, {
+              id: itemId,
+              cartId: activeCart.id,
+            })
+          : null;
 
         if (!item) {
           throw this.refuse(
@@ -147,11 +156,6 @@ export class CartService {
           );
         }
 
-        await manager.findOneOrFail(Cart, {
-          where: { id: item.cartId },
-          loadEagerRelations: false,
-          lock: { mode: 'pessimistic_write' },
-        });
         // Deleted by id, not by dropping it from `cart.items`: saving the
         // relation would try to null the item's cart_id instead.
         await manager.delete(CartItem, { id: item.id });
@@ -178,27 +182,38 @@ export class CartService {
    * if needed. `ON CONFLICT DO NOTHING` lets a concurrent request win the
    * partial unique index without aborting this transaction; the `FOR UPDATE`
    * read then serialises the two writers on the same row.
+   *
+   * A checkout can complete that row while this waits on its lock: the read
+   * then finds no active cart, and a second insert opens the new one.
    */
   private async lockActiveCartId(
     manager: EntityManager,
     userId: string
   ): Promise<string> {
-    await manager
-      .createQueryBuilder()
-      .insert()
-      .into(Cart)
-      .values({ userId, status: CartStatus.ACTIVE })
-      .orIgnore()
-      .execute();
+    for (let attempt = 1; ; attempt++) {
+      await manager
+        .createQueryBuilder()
+        .insert()
+        .into(Cart)
+        .values({ userId, status: CartStatus.ACTIVE })
+        .orIgnore()
+        .execute();
 
-    const cart = await manager.findOneOrFail(Cart, {
-      where: { userId, status: CartStatus.ACTIVE },
-      // A lock cannot sit on the outer join the eager items would add.
-      loadEagerRelations: false,
-      lock: { mode: 'pessimistic_write' },
-    });
+      const cart = await manager.findOne(Cart, {
+        where: { userId, status: CartStatus.ACTIVE },
+        // A lock cannot sit on the outer join the eager items would add.
+        loadEagerRelations: false,
+        lock: { mode: 'pessimistic_write' },
+      });
 
-    return cart.id;
+      if (cart) {
+        return cart.id;
+      }
+
+      if (attempt === MAX_ACTIVE_CART_ATTEMPTS) {
+        throw new Error(`No active cart for user ${userId} after retrying`);
+      }
+    }
   }
 
   /** Recomputes the total from the stored subtotals, in cents. */

@@ -293,4 +293,108 @@ describe('CartService (integration)', () => {
       ).rejects.toThrow(new NotFoundException('Cart item not found'));
     });
   });
+
+  describe('racing a checkout', () => {
+    type Settled<T> =
+      | { status: 'fulfilled'; value: T }
+      | { status: 'rejected'; reason: unknown };
+
+    /** Resolves once some query of this database waits on a row lock. */
+    async function untilALockIsAwaited(): Promise<void> {
+      const dataSource = moduleRef.get(DataSource);
+
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const [{ waiting }] = await dataSource.query(
+          `SELECT count(*)::int AS waiting FROM pg_stat_activity
+           WHERE datname = current_database() AND wait_event_type = 'Lock'`
+        );
+
+        if (waiting > 0) {
+          return;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      throw new Error('No query ever waited on the cart lock');
+    }
+
+    /**
+     * Holds the user's active cart as a checkout does, starts `action`, and
+     * once it waits on that lock completes the cart and commits: the exact
+     * interleaving a checkout in another tab produces.
+     */
+    async function whileACheckoutCompletes<T>(
+      userId: string,
+      action: () => Promise<T>
+    ): Promise<{ completedCartId: string; outcome: Settled<T> }> {
+      const runner = moduleRef.get(DataSource).createQueryRunner();
+      await runner.connect();
+      await runner.startTransaction();
+
+      try {
+        const [cart] = await runner.query(
+          `SELECT id FROM carts WHERE user_id = $1 AND status = 'active' FOR UPDATE`,
+          [userId]
+        );
+        const outcome = action().then(
+          (value): Settled<T> => ({ status: 'fulfilled', value }),
+          (reason): Settled<T> => ({ status: 'rejected', reason })
+        );
+
+        await untilALockIsAwaited();
+        await runner.query(
+          `UPDATE carts SET status = 'completed' WHERE id = $1`,
+          [cart.id]
+        );
+        await runner.commitTransaction();
+
+        return { completedCartId: cart.id, outcome: await outcome };
+      } finally {
+        await runner.release();
+      }
+    }
+
+    it('leaves a cart that a checkout completed while the removal waited untouched', async () => {
+      const userId = randomUUID();
+      const keyboard = given(makeProduct());
+      await service.addItem(userId, { productId: keyboard.id, quantity: 3 });
+      const mouse = given(makeProduct({ name: 'Mouse', price: 10 }));
+      const cart = await service.addItem(userId, {
+        productId: mouse.id,
+        quantity: 1,
+      });
+
+      const { outcome } = await whileACheckoutCompletes(userId, () =>
+        service.removeItem(userId, cart.items[0].id)
+      );
+
+      expect(outcome).toEqual({
+        status: 'rejected',
+        reason: new NotFoundException('Cart item not found'),
+      });
+      const completed = await carts.findOneByOrFail({ id: cart.id });
+      expect(completed.items).toHaveLength(2);
+      expect(completed.total).toBe(69.7);
+    });
+
+    it('adds to a new cart when a checkout completed the old one while the add waited', async () => {
+      const userId = randomUUID();
+      const product = given(makeProduct());
+      await service.addItem(userId, { productId: product.id, quantity: 1 });
+
+      const { completedCartId, outcome } = await whileACheckoutCompletes(
+        userId,
+        () => service.addItem(userId, { productId: product.id, quantity: 2 })
+      );
+
+      expect(outcome.status).toBe('fulfilled');
+      const next = (outcome as { value: Cart }).value;
+      expect(next.id).not.toBe(completedCartId);
+      expect(next.items).toHaveLength(1);
+      expect(next.items[0].quantity).toBe(2);
+      const completed = await carts.findOneByOrFail({ id: completedCartId });
+      expect(completed.items[0].quantity).toBe(1);
+    });
+  });
 });
