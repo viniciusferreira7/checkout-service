@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { toCents } from '@/common/money';
 import { EnvService } from '@/env/env.service';
 import { metrics } from '@/observability/metrics';
 import { checkoutServiceDetails } from '@/utils/checkout-service-details';
@@ -132,14 +133,17 @@ export class PaymentQueueService {
       return false;
     }
 
-    const itemsTotal = paymentOrder.items.reduce(
-      (acc, item) => acc + item.price * item.quantity,
+    // Compared in whole cents: summed as numbers, 19.9 * 3 never equals the
+    // 59.7 the cart stored.
+    const itemsTotalCents = paymentOrder.items.reduce(
+      (acc, item) => acc + toCents(item.price) * item.quantity,
       0
     );
 
-    const expectedAmount = itemsTotal - paymentOrder.discount;
+    const expectedAmountCents =
+      itemsTotalCents - toCents(paymentOrder.discount);
 
-    if (paymentOrder.amount !== expectedAmount) {
+    if (toCents(paymentOrder.amount) !== expectedAmountCents) {
       metrics.payment_orders_rejected.add(1, { reason: 'amount_mismatch' });
       this.logger.error('Payment amount does not match order total');
       return false;

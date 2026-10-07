@@ -150,6 +150,49 @@ describe('PaymentQueueService', () => {
       expect(rabbitMqService.publicMessage).toHaveBeenCalledTimes(1);
     });
 
+    // In plain numbers 19.9 * 3 is 59.699999999999996, never 59.7.
+    it('accepts a decimal price times a quantity that the cart stored rounded', async () => {
+      const order = makeOrder({
+        amount: 59.7,
+        items: [{ productId: 'product-1', quantity: 3, price: 19.9 }],
+      });
+
+      await expect(
+        service.publishPaymentOrderSafe(order)
+      ).resolves.toBeUndefined();
+
+      expect(rabbitMqService.publicMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('accepts decimal prices and a decimal discount', async () => {
+      const order = makeOrder({
+        amount: 0.2,
+        discount: 0.1,
+        items: [
+          { productId: 'product-1', quantity: 1, price: 0.1 },
+          { productId: 'product-2', quantity: 1, price: 0.2 },
+        ],
+      });
+
+      await expect(
+        service.publishPaymentOrderSafe(order)
+      ).resolves.toBeUndefined();
+    });
+
+    it('rejects an amount one cent off the items total', async () => {
+      const order = makeOrder({
+        amount: 59.71,
+        items: [{ productId: 'product-1', quantity: 3, price: 19.9 }],
+      });
+
+      await expect(service.publishPaymentOrderSafe(order)).rejects.toThrow(
+        'Invalid payment order'
+      );
+      expect(error).toHaveBeenCalledWith(
+        'Payment amount does not match order total'
+      );
+    });
+
     it.each([
       [
         'orderId is missing',
