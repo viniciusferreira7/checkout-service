@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, Logger } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { FakeRabbitmqService } from 'test/events/fake-rabbitmq-service';
@@ -252,6 +252,41 @@ describe('OrdersService (integration)', () => {
 
     it('answers an empty list to a user without orders', async () => {
       await expect(service.findAllByUser(randomUUID())).resolves.toEqual([]);
+    });
+  });
+
+  describe('findOneByUser', () => {
+    const place = (userId: string) =>
+      orders.save(
+        orders.create({
+          userId,
+          cartId: randomUUID(),
+          total: 10,
+          paymentMethod: 'pix',
+        })
+      );
+
+    it("answers the user's order", async () => {
+      const userId = randomUUID();
+      const order = await place(userId);
+
+      await expect(
+        service.findOneByUser(userId, order.id)
+      ).resolves.toMatchObject({
+        id: order.id,
+        total: 10,
+      });
+    });
+
+    it.each([
+      ['an order that does not exist', async () => randomUUID()],
+      ["another user's order", async () => (await place(randomUUID())).id],
+    ])('answers 404 for %s', async (_case, orderIdOf) => {
+      const orderId = await orderIdOf();
+
+      await expect(
+        service.findOneByUser(randomUUID(), orderId)
+      ).rejects.toThrow(new NotFoundException('Order not found'));
     });
   });
 });

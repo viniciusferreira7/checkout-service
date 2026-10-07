@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
 import { Cart } from '@/cart/entities/cart.entity';
@@ -26,6 +31,20 @@ export class OrdersService {
       where: { userId },
       order: { createdAt: 'DESC', id: 'ASC' },
     });
+  }
+
+  /**
+   * One of the user's orders. Someone else's order is the same 404 as a
+   * missing one, so the answer never reveals that an id exists.
+   */
+  async findOneByUser(userId: string, orderId: string): Promise<Order> {
+    const order = await this.orders.findOneBy({ id: orderId, userId });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return order;
   }
 
   /**

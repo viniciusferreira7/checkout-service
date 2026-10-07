@@ -90,4 +90,42 @@ describe('Orders routes (e2e)', () => {
       expect(response.body).toEqual(UNAUTHORIZED);
     });
   });
+
+  describe('GET /orders/:id', () => {
+    it("answers the user's order", async () => {
+      const userId = randomUUID();
+      const order = await placeOrder(userId, new Date());
+
+      const response = await get(userId, `/orders/${order.id}`).expect(200);
+
+      expect(response.body).toMatchObject({ id: order.id, total: 59.7 });
+      expect(response.body).not.toHaveProperty('userId');
+    });
+
+    it("answers 404, not 403, to another user's order", async () => {
+      const order = await placeOrder(randomUUID(), new Date());
+
+      const response = await get(randomUUID(), `/orders/${order.id}`).expect(
+        404
+      );
+
+      expect(response.body.message).toBe('Order not found');
+    });
+
+    it('answers 404 to an order that does not exist', async () => {
+      await get(randomUUID(), `/orders/${randomUUID()}`).expect(404);
+    });
+
+    it('answers 400 to an id that is not a uuid', async () => {
+      await get(randomUUID(), '/orders/not-a-uuid').expect(400);
+    });
+
+    it('answers 401 without a token', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/orders/${randomUUID()}`)
+        .expect(401);
+
+      expect(response.body).toEqual(UNAUTHORIZED);
+    });
+  });
 });

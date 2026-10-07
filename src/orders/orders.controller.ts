@@ -1,6 +1,8 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Req } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -26,5 +28,19 @@ export class OrdersController {
     const orders = await this.ordersService.findAllByUser(request.user.id);
 
     return orders.map((order) => OrderResponseDto.from(order));
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'One of the user’s orders' })
+  @ApiOkResponse({ type: OrderResponseDto })
+  @ApiBadRequestResponse({ description: 'The order id is not a UUID' })
+  @ApiNotFoundResponse({ description: 'No order with this id is yours' })
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: { user: AuthenticatedUser }
+  ): Promise<OrderResponseDto> {
+    return OrderResponseDto.from(
+      await this.ordersService.findOneByUser(request.user.id, id)
+    );
   }
 }
