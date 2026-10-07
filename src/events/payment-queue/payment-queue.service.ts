@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { toCents } from '@/common/money';
+import { PAYMENT_METHODS } from '@/common/payment-methods';
 import { EnvService } from '@/env/env.service';
 import { metrics } from '@/observability/metrics';
 import { checkoutServiceDetails } from '@/utils/checkout-service-details';
@@ -8,12 +9,7 @@ import type { PaymentOrderMessage } from '../interfaces/payments-queue.interface
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
 import type { MetadataMessage } from './metadata-message.interface';
 
-const KNOWN_PAYMENT_METHODS = new Set([
-  'credit_card',
-  'debit_card',
-  'pix',
-  'boleto',
-]);
+const KNOWN_PAYMENT_METHODS = new Set<string>(PAYMENT_METHODS);
 
 /**
  * `paymentMethod` arrives unchecked, so as a metric attribute it is bucketed
