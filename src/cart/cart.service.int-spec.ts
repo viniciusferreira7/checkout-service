@@ -225,4 +225,72 @@ describe('CartService (integration)', () => {
       expect(second.id).not.toBe(first.id);
     });
   });
+
+  describe('removeItem', () => {
+    async function cartWithTwoItems(userId: string) {
+      const keyboard = given(makeProduct());
+      await service.addItem(userId, { productId: keyboard.id, quantity: 3 });
+      const mouse = given(makeProduct({ name: 'Mouse', price: 10 }));
+
+      return service.addItem(userId, { productId: mouse.id, quantity: 1 });
+    }
+
+    it('removes the item and recomputes the total', async () => {
+      const userId = randomUUID();
+      const cart = await cartWithTwoItems(userId);
+      const [mouse] = cart.items.filter((item) => item.productName === 'Mouse');
+
+      const updated = await service.removeItem(userId, mouse.id);
+
+      expect(updated.items.map((item) => item.productName)).toEqual([
+        'Mechanical keyboard',
+      ]);
+      expect(updated.total).toBe(59.7);
+      expect(operations).toHaveBeenCalledWith(1, {
+        operation: 'remove_item',
+        outcome: 'succeeded',
+      });
+    });
+
+    it('leaves an empty active cart with a zero total', async () => {
+      const userId = randomUUID();
+      const product = given(makeProduct());
+      const cart = await service.addItem(userId, {
+        productId: product.id,
+        quantity: 1,
+      });
+
+      const updated = await service.removeItem(userId, cart.items[0].id);
+
+      expect(updated).toMatchObject({ status: CartStatus.ACTIVE, total: 0 });
+      expect(updated.items).toEqual([]);
+    });
+
+    it.each([
+      ['an item that does not exist', async () => randomUUID()],
+      [
+        "another user's item",
+        async () => (await cartWithTwoItems(randomUUID())).items[0].id,
+      ],
+    ])('answers 404 for %s and changes nothing', async (_case, itemIdOf) => {
+      const userId = randomUUID();
+      await cartWithTwoItems(userId);
+      const itemId = await itemIdOf();
+
+      await expect(service.removeItem(userId, itemId)).rejects.toThrow(
+        new NotFoundException('Cart item not found')
+      );
+      expect((await service.findActive(userId))?.items).toHaveLength(2);
+    });
+
+    it('answers 404 for an item of a completed cart', async () => {
+      const userId = randomUUID();
+      const cart = await cartWithTwoItems(userId);
+      await carts.update(cart.id, { status: CartStatus.COMPLETED });
+
+      await expect(
+        service.removeItem(userId, cart.items[0].id)
+      ).rejects.toThrow(new NotFoundException('Cart item not found'));
+    });
+  });
 });

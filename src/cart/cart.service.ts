@@ -120,6 +120,60 @@ export class CartService {
   }
 
   /**
+   * Removes one item of the user's active cart. An item that does not exist,
+   * belongs to someone else or sits in a finished cart is the same 404, so
+   * the answer never reveals that an id exists.
+   */
+  async removeItem(userId: string, itemId: string): Promise<Cart> {
+    const startedAt = Date.now();
+
+    try {
+      const cart = await this.dataSource.transaction(async (manager) => {
+        const item = await manager
+          .getRepository(CartItem)
+          .createQueryBuilder('item')
+          .innerJoin('item.cart', 'cart')
+          .where('item.id = :itemId', { itemId })
+          .andWhere('cart.userId = :userId', { userId })
+          .andWhere('cart.status = :status', { status: CartStatus.ACTIVE })
+          .getOne();
+
+        if (!item) {
+          throw this.refuse(
+            'remove_item',
+            'item_not_found',
+            startedAt,
+            new NotFoundException('Cart item not found')
+          );
+        }
+
+        await manager.findOneOrFail(Cart, {
+          where: { id: item.cartId },
+          loadEagerRelations: false,
+          lock: { mode: 'pessimistic_write' },
+        });
+        // Deleted by id, not by dropping it from `cart.items`: saving the
+        // relation would try to null the item's cart_id instead.
+        await manager.delete(CartItem, { id: item.id });
+        await this.refreshTotal(manager, item.cartId, startedAt);
+
+        return manager.findOneByOrFail(Cart, { id: item.cartId });
+      });
+
+      this.settle('remove_item', 'succeeded', startedAt);
+      this.logger.log(
+        `User ${userId} removed item ${itemId} from cart ${cart.id}`
+      );
+
+      return cart;
+    } catch (error) {
+      this.settleUnexpected('remove_item', error, startedAt);
+
+      throw error;
+    }
+  }
+
+  /**
    * Locks the user's active cart row for this transaction, creating it first
    * if needed. `ON CONFLICT DO NOTHING` lets a concurrent request win the
    * partial unique index without aborting this transaction; the `FOR UPDATE`
