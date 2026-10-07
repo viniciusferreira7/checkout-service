@@ -52,6 +52,15 @@ export const metrics = defineMetrics(
       description: 'Time spent on one cart change',
       unit: 'ms',
     },
+    orders_placed: {
+      kind: 'counter',
+      description: 'Checkout attempts, by how they settled and payment method',
+    },
+    order_total: {
+      kind: 'histogram',
+      description: 'Total of each order placed',
+      unit: '{amount}',
+    },
   },
   'checkout-service'
 );

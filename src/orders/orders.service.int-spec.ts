@@ -12,6 +12,7 @@ import { fromCents, toCents } from '@/common/money';
 import type { PaymentMethod } from '@/common/payment-methods';
 import { PaymentQueueService } from '@/events/payment-queue/payment-queue.service';
 import { RabbitmqService } from '@/events/rabbitmq/rabbitmq.service';
+import { metrics } from '@/observability/metrics';
 import { Order } from './entities/order.entity';
 import { OrderStatus } from './enums/order-status.enum';
 import { OrdersService } from './orders.service';
@@ -287,6 +288,81 @@ describe('OrdersService (integration)', () => {
       await expect(
         service.findOneByUser(randomUUID(), orderId)
       ).rejects.toThrow(new NotFoundException('Order not found'));
+    });
+  });
+
+  describe('metrics', () => {
+    // Under NODE_ENV=test every counter is one shared no-op object: each
+    // instrument gets its own mock so a value on the wrong one fails.
+    const originals = { ...metrics };
+    let placed: ReturnType<typeof vi.fn>;
+    let total: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      placed = vi.fn();
+      total = vi.fn();
+      Object.assign(metrics, {
+        orders_placed: { add: placed },
+        order_total: { record: total },
+      });
+    });
+
+    afterEach(() => {
+      Object.assign(metrics, originals);
+    });
+
+    it('counts a placed order and records its total, by payment method', async () => {
+      const userId = randomUUID();
+      await seedCart(userId, [{ price: 19.9, quantity: 3 }]);
+
+      await service.checkout(userId, 'pix');
+
+      expect(placed).toHaveBeenCalledExactlyOnceWith(1, {
+        outcome: 'succeeded',
+        payment_method: 'pix',
+      });
+      expect(total).toHaveBeenCalledExactlyOnceWith(59.7, {
+        payment_method: 'pix',
+      });
+    });
+
+    it('counts an empty cart and records no total', async () => {
+      await expect(service.checkout(randomUUID(), 'boleto')).rejects.toThrow(
+        'Cart is empty'
+      );
+
+      expect(placed).toHaveBeenCalledExactlyOnceWith(1, {
+        outcome: 'empty_cart',
+        payment_method: 'boleto',
+      });
+      expect(total).not.toHaveBeenCalled();
+    });
+
+    it('counts an unexpected failure as failed, bucketing an unknown method', async () => {
+      const userId = randomUUID();
+      await seedCart(userId, [{ price: 10, quantity: 1 }]);
+
+      await expect(
+        service.checkout(userId, 'x'.repeat(51) as PaymentMethod)
+      ).rejects.toThrow();
+
+      expect(placed).toHaveBeenCalledExactlyOnceWith(1, {
+        outcome: 'failed',
+        payment_method: 'other',
+      });
+    });
+
+    it('still counts the order as placed when publishing fails', async () => {
+      const userId = randomUUID();
+      await seedCart(userId, [{ price: 10, quantity: 1 }]);
+      vi.spyOn(broker, 'publicMessage').mockResolvedValue(false);
+
+      await service.checkout(userId, 'pix');
+
+      expect(placed).toHaveBeenCalledExactlyOnceWith(1, {
+        outcome: 'succeeded',
+        payment_method: 'pix',
+      });
     });
   });
 });

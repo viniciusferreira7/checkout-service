@@ -10,10 +10,16 @@ import { Cart } from '@/cart/entities/cart.entity';
 import { CartItem } from '@/cart/entities/cart-item.entity';
 import { CartStatus } from '@/cart/enums/cart-status.enum';
 import type { PaymentMethod } from '@/common/payment-methods';
-import { PaymentQueueService } from '@/events/payment-queue/payment-queue.service';
+import {
+  PaymentQueueService,
+  paymentMethodBucket,
+} from '@/events/payment-queue/payment-queue.service';
+import { metrics } from '@/observability/metrics';
 import { getErrorDetails } from '@/utils/error.util';
 import { Order } from './entities/order.entity';
 import { OrderStatus } from './enums/order-status.enum';
+
+type CheckoutOutcome = 'succeeded' | 'empty_cart' | 'failed';
 
 @Injectable()
 export class OrdersService {
@@ -54,8 +60,10 @@ export class OrdersService {
    * that was rolled back.
    */
   async checkout(userId: string, paymentMethod: PaymentMethod): Promise<Order> {
-    const { order, items } = await this.dataSource.transaction(
-      async (manager) => {
+    let placed: { order: Order; items: CartItem[] };
+
+    try {
+      placed = await this.dataSource.transaction(async (manager) => {
         // A second checkout waits on this lock and then finds the cart
         // completed: no row matches, so it answers "Cart is empty".
         const cart = await manager.findOne(Cart, {
@@ -86,9 +94,30 @@ export class OrdersService {
         );
 
         return { order, items };
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        this.settle('empty_cart', paymentMethod);
+        this.logger.warn(`User ${userId} tried to check out an empty cart`);
+      } else {
+        this.settle('failed', paymentMethod);
+        this.logger.error(
+          `Checkout failed unexpectedly for user ${userId}`,
+          getErrorDetails(error).stack
+        );
       }
-    );
 
+      throw error;
+    }
+
+    const { order, items } = placed;
+
+    // Placed means committed: a publish that fails afterwards is the payment
+    // queue's own failure, counted there.
+    this.settle('succeeded', paymentMethod);
+    metrics.order_total.record(order.total, {
+      payment_method: paymentMethodBucket(paymentMethod),
+    });
     this.logger.log(
       `User ${userId} placed order ${order.id} from cart ${order.cartId}`
     );
@@ -96,6 +125,14 @@ export class OrdersService {
     await this.publishPayment(order, items);
 
     return order;
+  }
+
+  /** Records how one checkout ended; ids stay in the log, not here. */
+  private settle(outcome: CheckoutOutcome, paymentMethod: string): void {
+    metrics.orders_placed.add(1, {
+      outcome,
+      payment_method: paymentMethodBucket(paymentMethod),
+    });
   }
 
   /**
