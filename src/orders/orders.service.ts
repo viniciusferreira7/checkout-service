@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, type Repository } from 'typeorm';
 import { Cart } from '@/cart/entities/cart.entity';
 import { CartItem } from '@/cart/entities/cart-item.entity';
 import { CartStatus } from '@/cart/enums/cart-status.enum';
@@ -14,9 +15,18 @@ export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
   constructor(
+    @InjectRepository(Order) private readonly orders: Repository<Order>,
     private readonly dataSource: DataSource,
     private readonly paymentQueue: PaymentQueueService
   ) {}
+
+  /** The user's orders, newest first; the id breaks ties so pages are stable. */
+  findAllByUser(userId: string): Promise<Order[]> {
+    return this.orders.find({
+      where: { userId },
+      order: { createdAt: 'DESC', id: 'ASC' },
+    });
+  }
 
   /**
    * Turns the user's active cart into a pending order. Completing the cart

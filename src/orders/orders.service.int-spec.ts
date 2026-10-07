@@ -225,4 +225,33 @@ describe('OrdersService (integration)', () => {
       );
     });
   });
+
+  describe('findAllByUser', () => {
+    const at = (iso: string) => new Date(iso);
+
+    it("answers only the user's orders, newest first", async () => {
+      const userId = randomUUID();
+      const make = (createdAt: Date, owner = userId) =>
+        orders.create({
+          userId: owner,
+          cartId: randomUUID(),
+          total: 10,
+          paymentMethod: 'pix',
+          createdAt,
+        });
+      const [oldest, newest] = await orders.save([
+        make(at('2026-10-01T12:00:00Z')),
+        make(at('2026-10-03T12:00:00Z')),
+        make(at('2026-10-02T12:00:00Z'), randomUUID()),
+      ]);
+
+      const found = await service.findAllByUser(userId);
+
+      expect(found.map((order) => order.id)).toEqual([newest.id, oldest.id]);
+    });
+
+    it('answers an empty list to a user without orders', async () => {
+      await expect(service.findAllByUser(randomUUID())).resolves.toEqual([]);
+    });
+  });
 });
