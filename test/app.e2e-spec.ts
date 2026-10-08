@@ -25,6 +25,13 @@ describe('AppController (e2e)', () => {
     return request(app.getHttpServer()).head('/').expect(200);
   });
 
+  it('no longer exposes the broker test endpoint', () => {
+    return request(app.getHttpServer())
+      .post('/test/send-message')
+      .send({ message: 'hi' })
+      .expect(404);
+  });
+
   it('returns 404 for an unknown route', () => {
     return request(app.getHttpServer()).get('/unknown').expect(404);
   });
