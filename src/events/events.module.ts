@@ -4,6 +4,6 @@ import { RabbitmqService } from './rabbitmq/rabbitmq.service';
 
 @Module({
   providers: [RabbitmqService, PaymentQueueService],
-  exports: [PaymentQueueService],
+  exports: [PaymentQueueService, RabbitmqService],
 })
 export class EventsModule {}

@@ -30,7 +30,15 @@ export class FakeRabbitmqService implements Partial<RabbitmqService> {
   }
 
   getChannel() {
-    return {} as ReturnType<RabbitmqService['getChannel']>;
+    return {
+      checkExchange: async () => {
+        if (!this.connected) {
+          throw new Error('Fake RabbitMQ disconnected');
+        }
+
+        return {};
+      },
+    } as unknown as ReturnType<RabbitmqService['getChannel']>;
   }
 
   async publicMessage(params: PublicMessageParams) {

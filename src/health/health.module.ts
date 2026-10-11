@@ -1,5 +1,12 @@
 import { Module } from '@nestjs/common';
+import { EventsModule } from '@/events/events.module';
+import { DatabaseHealthIndicator } from './database-health.indicator';
 import { HealthController } from './health.controller';
+import { RabbitmqHealthIndicator } from './rabbitmq-health.indicator';
 
-@Module({ controllers: [HealthController] })
+@Module({
+  imports: [EventsModule],
+  controllers: [HealthController],
+  providers: [DatabaseHealthIndicator, RabbitmqHealthIndicator],
+})
 export class HealthModule {}
